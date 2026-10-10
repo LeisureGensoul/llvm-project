@@ -155,8 +155,8 @@ public:
   /// \param Str The string to construct the suffix tree for.
   /// \param OutlinerLeafDescendants Whether to consider leaf descendants or
   /// only leaf children (used by Machine Outliner).
-  /// \param BoundaryStart Values at or above this lower bound must be unique
-  /// terminators.
+  /// \param BoundaryStart Values at or above this lower bound are terminators
+  /// and may repeat.
   LLVM_ABI SuffixTree(const ArrayRef<unsigned> &Str,
                       bool OutlinerLeafDescendants = false,
                       unsigned BoundaryStart = SuffixTreeNode::EmptyIdx);

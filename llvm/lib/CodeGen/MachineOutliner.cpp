@@ -169,7 +169,7 @@ namespace {
 struct InstructionMapper {
   const MachineModuleInfo &MMI;
 
-  /// The next available integer to assign to a \p MachineInstr that
+  /// The integer to assign to a \p MachineInstr that
   /// cannot be outlined.
   ///
   /// Set to -3 for compatability with \p DenseMapInfo<unsigned>.
@@ -194,7 +194,7 @@ struct InstructionMapper {
   SmallVector<MachineBasicBlock::iterator> InstrList;
 
   // Set if we added an illegal number in the previous step.
-  // Since each illegal number is unique, we only need one of them between
+  // Since illegal numbers terminate matches, we only need one of them between
   // each range of legal numbers. This lets us make sure we don't add more
   // than one illegal number per range.
   bool AddedIllegalLastTime = false;
@@ -251,8 +251,7 @@ struct InstructionMapper {
 
   /// Maps \p *It to an illegal integer.
   ///
-  /// Updates \p InstrListForMBB, \p UnsignedVecForMBB, and \p
-  /// IllegalInstrNumber.
+  /// Updates \p InstrListForMBB and \p UnsignedVecForMBB.
   ///
   /// \returns The integer that \p *It was mapped to.
   unsigned mapToIllegalUnsigned(
@@ -273,7 +272,6 @@ struct InstructionMapper {
 
     InstrListForMBB.push_back(It);
     UnsignedVecForMBB.push_back(IllegalInstrNumber);
-    IllegalInstrNumber--;
     // Statistics.
     ++NumIllegalInUnsignedVec;
 
@@ -288,7 +286,7 @@ struct InstructionMapper {
   ///
   /// Two instructions are assigned the same integer if they are identical.
   /// If an instruction is deemed unsafe to outline, then it will be assigned an
-  /// unique integer. The resulting mapping is placed into a suffix tree and
+  /// illegal integer. The resulting mapping is placed into a suffix tree and
   /// queried for candidates.
   ///
   /// \param MBB The \p MachineBasicBlock to be translated into integers.
@@ -414,10 +412,9 @@ struct InstructionMapper {
     // Are there enough legal instructions in the block for outlining to be
     // possible?
     if (HaveLegalRange) {
-      // After we're done every insertion, uniquely terminate this part of the
+      // After we're done every insertion, terminate this part of the
       // "string". This makes sure we won't match across basic block or function
-      // boundaries since the "end" is encoded uniquely and thus appears in no
-      // repeated substring.
+      // boundaries.
       mapToIllegalUnsigned(It, CanOutlineWithPrevInstr, UnsignedVecForMBB,
                            InstrListForMBB);
       ++NumSentinels;

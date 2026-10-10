@@ -152,8 +152,7 @@ unsigned SuffixTree::extend(unsigned EndIdx, unsigned SuffixesToAdd) {
     unsigned FirstChar = Str[Active.Idx];
 
     // Have we inserted anything starting with FirstChar at the current node?
-    // Each boundary symbol is unique, so it cannot already label an outgoing
-    // edge at the active node. Skip the child lookup.
+    // Boundary leaves are stored separately, so skip the child lookup.
     if (auto It = isBoundary(FirstChar) ? Active.Node->Children.end()
                                         : Active.Node->Children.find(FirstChar);
         It == Active.Node->Children.end()) {
@@ -195,7 +194,7 @@ unsigned SuffixTree::extend(unsigned EndIdx, unsigned SuffixesToAdd) {
       unsigned LastChar = Str[EndIdx];
 
       // Is the string we're trying to insert a substring of the next node?
-      if (Str[NextStartIdx + Active.Len] == LastChar) {
+      if (Str[NextStartIdx + Active.Len] == LastChar && !isBoundary(LastChar)) {
         // If yes, then we're done for this step. Remember our insertion point
         // and move to the next end index. At this point, we have an implicit
         // suffix tree.

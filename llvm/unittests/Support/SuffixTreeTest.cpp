@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/SuffixTree.h"
+#include "llvm/ADT/STLExtras.h"
 #include "gtest/gtest.h"
 #include <vector>
 
@@ -269,6 +270,26 @@ TEST(SuffixTreeTest, TestSubstringRepeatsWithLeafDescendants) {
           EXPECT_EQ(RepeatedRepetitionData[StartIdx], 2u);
           EXPECT_EQ(RepeatedRepetitionData[StartIdx + 1], 3u);
         }
+      }
+    }
+  }
+}
+
+TEST(SuffixTreeTest, TestRepeatedBoundaries) {
+  for (unsigned BoundaryStart : {-3u, 5u}) {
+    for (unsigned Boundary : {BoundaryStart, BoundaryStart + 1}) {
+      std::vector<unsigned> Data = {1, 2, BoundaryStart, 3, 4, 1, 2, Boundary,
+                                    3, 4, BoundaryStart};
+      for (bool LeafDescendants : {false, true}) {
+        SuffixTree ST(Data, LeafDescendants, BoundaryStart);
+        std::vector<std::vector<unsigned>> Starts;
+        for (const auto &RS : ST) {
+          EXPECT_EQ(RS.Length, 2u);
+          Starts.emplace_back(RS.StartIndices.begin(), RS.StartIndices.end());
+          llvm::sort(Starts.back());
+        }
+        llvm::sort(Starts);
+        EXPECT_EQ(Starts, (std::vector<std::vector<unsigned>>{{0, 5}, {3, 8}}));
       }
     }
   }
