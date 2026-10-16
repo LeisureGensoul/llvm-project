@@ -1,0 +1,6 @@
+# 阶段名  起点  终点  CPU来源  父阶段
+# 总量、映射、构建、枚举与选择
+outliner   MachineOutliner::runOnModule@entry     MachineOutliner::runOnModule@return    native                     -
+mapping    MachineOutliner::populateMapper@entry  MachineOutliner::populateMapper@return bpf                        outliner
+tree       llvm::SuffixTree::SuffixTree@entry     llvm::SuffixTree::SuffixTree@return    bpf                        outliner
+selection  llvm::SuffixTree::SuffixTree@return    MachineOutliner::outline@return        bpf                        outliner

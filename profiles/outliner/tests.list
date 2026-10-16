@@ -1,0 +1,5 @@
+# unit：binary（相对 LLVM 构建目录）  gtest filter
+# lit：路径或 glob（相对 llvm/test/）；空列表：跳过正确性
+unit unittests/Support/SupportTests SuffixTreeTest.*
+lit  CodeGen/AArch64/*outlin*
+lit  CodeGen/X86/*outlin*

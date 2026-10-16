@@ -1,0 +1,31 @@
+# 输入集       负载      后端  程序             Ninja目标         产物路径（相对负载构建目录）
+ctmark         ctmark    X86   7zip             7zip-benchmark    CTMark/7zip/7zip-benchmark
+ctmark         ctmark    X86   Bullet           bullet            CTMark/Bullet/bullet
+ctmark         ctmark    X86   tramp3d-v4       tramp3d-v4        CTMark/tramp3d-v4/tramp3d-v4
+ctmark         ctmark    X86   kimwitu++        kc                CTMark/kimwitu++/kc
+ctmark         ctmark    X86   lencod           lencod            CTMark/lencod/lencod
+ctmark         ctmark    X86   SPASS            SPASS             CTMark/SPASS/SPASS
+ctmark         ctmark    X86   ClamAV           clamscan          CTMark/ClamAV/clamscan
+ctmark         ctmark    X86   sqlite3          sqlite3           CTMark/sqlite3/sqlite3
+ctmark         ctmark    X86   consumer-typeset consumer-typeset  CTMark/consumer-typeset/consumer-typeset
+ctmark         ctmark    X86   mafft            pairlocalalign    CTMark/mafft/pairlocalalign
+
+spec2017       spec2017  X86   500.perlbench_r   500.perlbench_r   External/SPEC/CINT2017rate/500.perlbench_r/500.perlbench_r
+spec2017       spec2017  X86   502.gcc_r         502.gcc_r         External/SPEC/CINT2017rate/502.gcc_r/502.gcc_r
+spec2017       spec2017  X86   505.mcf_r         505.mcf_r         External/SPEC/CINT2017rate/505.mcf_r/505.mcf_r
+spec2017       spec2017  X86   508.namd_r        508.namd_r        External/SPEC/CFP2017rate/508.namd_r/508.namd_r
+spec2017       spec2017  X86   510.parest_r      510.parest_r      External/SPEC/CFP2017rate/510.parest_r/510.parest_r
+spec2017       spec2017  X86   511.povray_r      511.povray_r      External/SPEC/CFP2017rate/511.povray_r/511.povray_r
+spec2017       spec2017  X86   519.lbm_r         519.lbm_r         External/SPEC/CFP2017rate/519.lbm_r/519.lbm_r
+spec2017       spec2017  X86   520.omnetpp_r     520.omnetpp_r     External/SPEC/CINT2017rate/520.omnetpp_r/520.omnetpp_r
+spec2017       spec2017  X86   523.xalancbmk_r   523.xalancbmk_r   External/SPEC/CINT2017rate/523.xalancbmk_r/523.xalancbmk_r
+spec2017       spec2017  X86   525.x264_r        525.x264_r        External/SPEC/CINT2017rate/525.x264_r/525.x264_r
+spec2017       spec2017  X86   526.blender_r     526.blender_r     External/SPEC/CFP2017rate/526.blender_r/526.blender_r
+spec2017       spec2017  X86   531.deepsjeng_r   531.deepsjeng_r   External/SPEC/CINT2017rate/531.deepsjeng_r/531.deepsjeng_r
+spec2017       spec2017  X86   538.imagick_r     538.imagick_r     External/SPEC/CFP2017rate/538.imagick_r/538.imagick_r
+spec2017       spec2017  X86   541.leela_r       541.leela_r       External/SPEC/CINT2017rate/541.leela_r/541.leela_r
+spec2017       spec2017  X86   544.nab_r         544.nab_r         External/SPEC/CFP2017rate/544.nab_r/544.nab_r
+spec2017       spec2017  X86   557.xz_r         557.xz_r          External/SPEC/CINT2017rate/557.xz_r/557.xz_r
+
+clang-X86      clang     X86   clang            clang             bin/clang
+lld-X86        lld       X86   lld              lld               bin/lld
