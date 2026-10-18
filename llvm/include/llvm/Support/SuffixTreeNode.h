@@ -67,6 +67,7 @@ private:
   /// descendants with indices i, i+1, ..., j, then its LeftLeafIdx is i and
   /// its RightLeafIdx is j. These indices are for LeafNodes in the SuffixTree
   /// class, which is constructed using post-order depth-first traversal.
+  /// Filtering may replace the range with retained occurrence positions.
   /// EmptyIdx marks a node that is not enumerated as a leaf-descendant
   /// candidate.
   unsigned LeftLeafIdx = EmptyIdx;

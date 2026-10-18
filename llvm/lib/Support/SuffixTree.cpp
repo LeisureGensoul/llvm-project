@@ -201,11 +201,42 @@ void SuffixTree::setLeafNodes(bool FilterCandidates) {
     Node->setRightLeafIdx(SuffixTreeNode::EmptyIdx);
     ToVisit.push_back(Node);
   };
+  // Prefixes share a start; suffixes share an end with a selected occurrence.
+  std::vector<unsigned> CoveredEnd(Str.size(), 0);
+  std::vector<unsigned> CoveredStart(Str.size() + 1, SuffixTreeNode::EmptyIdx);
+  std::vector<unsigned> RetainedPositions;
   for (const Candidate &C : ByPriority) {
     SuffixTreeNode *Node = C.Node;
     auto &Info = ChildrenMap.find(Node)->second;
     if (Info.Visited)
       continue;
+
+    // Keep independent ranges so filtering a prefix or suffix cannot modify
+    // positions shared with another candidate in the original leaf array.
+    unsigned FirstLeafIdx = RetainedPositions.size();
+    unsigned Length = Node->getConcatLen();
+    for (unsigned I = Node->getLeftLeafIdx(); I <= Node->getRightLeafIdx();
+         ++I) {
+      unsigned Start = LeafNodes[I];
+      if (CoveredEnd[Start] < Start + Length &&
+          CoveredStart[Start + Length] > Start)
+        RetainedPositions.push_back(Start);
+    }
+    if (!predictedPriority(Length, RetainedPositions.size() - FirstLeafIdx)) {
+      RetainedPositions.resize(FirstLeafIdx);
+      Node->setLeftLeafIdx(SuffixTreeNode::EmptyIdx);
+      Node->setRightLeafIdx(SuffixTreeNode::EmptyIdx);
+      continue;
+    }
+
+    Node->setLeftLeafIdx(FirstLeafIdx);
+    Node->setRightLeafIdx(RetainedPositions.size() - 1);
+    for (unsigned Start :
+         ArrayRef<unsigned>(RetainedPositions).drop_front(FirstLeafIdx)) {
+      unsigned End = Start + Length;
+      CoveredEnd[Start] = std::max(CoveredEnd[Start], End);
+      CoveredStart[End] = std::min(CoveredStart[End], Start);
+    }
 
     // Keep this node and filter the closure of children and reverse suffix
     // links.
@@ -222,6 +253,7 @@ void SuffixTree::setLeafNodes(bool FilterCandidates) {
         Filter(Pred);
     }
   }
+  LeafNodes = std::move(RetainedPositions);
 }
 
 unsigned SuffixTree::extend(unsigned EndIdx, unsigned SuffixesToAdd) {

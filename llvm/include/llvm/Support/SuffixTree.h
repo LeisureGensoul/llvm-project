@@ -140,6 +140,7 @@ private:
   /// of these leaf nodes in the vector matches the order of the leaves in the
   /// tree from left to right if one were to draw the tree on paper.
   /// Each leaf is represented by its suffix start index.
+  /// Filtering gives each retained candidate its own occurrence range.
   std::vector<unsigned> LeafNodes;
 
   /// Collect leaf descendants in post-order and record each node's leaf range.
@@ -155,7 +156,8 @@ public:
   /// \param BoundaryStart Values at or above this lower bound are terminators
   /// and may repeat.
   /// \param FilterCandidates Filter the closure of children and reverse
-  /// suffix links in predicted priority order.
+  /// suffix links in predicted priority order, and remove covered occurrences
+  /// that share a start or end with a selection.
   LLVM_ABI SuffixTree(const ArrayRef<unsigned> &Str,
                       bool OutlinerLeafDescendants = false,
                       unsigned BoundaryStart = SuffixTreeNode::EmptyIdx,
@@ -178,7 +180,7 @@ public:
     const std::vector<unsigned> &LeafNodes;
 
     /// Whether to consider leaf descendants or only leaf children.
-    bool OutlinerLeafDescendants = !LeafNodes.empty();
+    bool OutlinerLeafDescendants;
 
     /// Move the iterator to the next repeated substring.
     LLVM_ABI void advance();
@@ -206,8 +208,10 @@ public:
     }
 
     RepeatedSubstringIterator(SuffixTreeNode *N,
-                              const std::vector<unsigned> &LeafNodes = {})
-        : N(N), LeafNodes(LeafNodes) {
+                              const std::vector<unsigned> &LeafNodes = {},
+                              bool UseLeafDescendants = false)
+        : N(N), LeafNodes(LeafNodes),
+          OutlinerLeafDescendants(UseLeafDescendants || !LeafNodes.empty()) {
       // Do we have a non-null node?
       if (!N)
         return;
@@ -219,7 +223,9 @@ public:
   };
 
   using iterator = RepeatedSubstringIterator;
-  iterator begin() { return iterator(Root, LeafNodes); }
+  iterator begin() {
+    return iterator(Root, LeafNodes, OutlinerLeafDescendants);
+  }
   iterator end() { return iterator(nullptr); }
 };
 
