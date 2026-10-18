@@ -7,8 +7,8 @@
 修改 [config.sh](config.sh)、[commits.list](commits.list)；每次使用新的 `RESULTS` 目录。
 
 ```bash
-# llvm-project 根目录
-cd llvm-bench
+# 从 LLVM 工作目录进入同级实验目录
+cd ../llvm-bench
 bash run.sh prepare
 bash run.sh measure
 bash run.sh summarize
@@ -25,13 +25,12 @@ bash run.sh summarize
 
 ## 当前本地基线
 
+- `llvm-bench` 和 `llvm-project` 为同级工作树，分别使用实验分支和 LLVM 优化分支，可独立切换。
 - 固定 main：`f14f34f217a99d77628d547b1b3ba9fa47fbd06b`；提交清单为此基线上的四个 PR、14 个优化提交。
-- 保留当前编译器、`build/pr-metadata-f14/` 和
-  `results/checkpoint-validation/pr-metadata-f14/checkpoints/`；保持绝对路径。
-- `inputs/pr-metadata-f14/` 是可删除的输入命令缓存；删除后，测量前先运行 `prepare` 重建。
+- `WORK` 位于 `../llvm-project/llvm-bench`；现有编译器、负载构建、镜像和宿主 CRIU 入口使用其绝对路径。实验目录中的 `tools/`、`src/`、`build/`、`results/` 通过相对链接指向这些缓存。
+- `prepare` 生成输入命令缓存；复用镜像时保持 `WORK` 的绝对路径。
 - 后续补充优化：更新 `commits.list`、换新的 `RESULTS`，仍执行三步；输入和镜像继续复用。
-- 首个 metadata 优化的 [10 轮结果](results/pr-metadata-ab-10rounds-20261016/TRIMMED-REPORT.md)：
-  逐轮汇总后，CPU、RSS 各自按数值去掉一个最大值、一个最小值，取剩余 8 次均值；原始 10 轮全部保留。
+- [PR 与实验记录](results/README.md)包含各次性能比较；十轮数据按数值去掉最大、最小值后，取剩余八轮均值。
 
 ## 配置
 
@@ -50,12 +49,12 @@ bash run.sh summarize
 | `PREPARE_JOBS` | 准备并行度、NoLTO 每批单元上限；默认 16 |
 | `PASS_CPU`、`COLLECTOR_CPU` | 被测 pass、采集器；不同物理核心 |
 | `PROJECT`、`SUITE`、`SPEC2017_ROOT` | llvm-project、llvm-test-suite、授权 cpu2017 源码；默认同级 |
-| `WORK`、`TOOLROOT` | 工作目录、辅助工具；默认本目录、`tools/<INPUT_COMMIT>/` |
+| `WORK`、`TOOLROOT` | 固定缓存目录、辅助工具；当前 `WORK` 为相对实验目录的 `../llvm-project/llvm-bench`，工具为其下的 `tools/<INPUT_COMMIT>/` |
 | `INPUT_SOURCE`、`INPUT_BUILD`、`WORKLOAD_BUILD` | 编译器源码、编译器构建、负载构建；当前 `src/compiler-<INPUT_COMMIT>/`、`build/compiler-<INPUT_COMMIT>/`、`build/pr-metadata-f14/` |
 | `INPUTS`、`CHECKPOINTS`、`RESULTS` | 命令、压缩镜像、本次结果；按输入集分目录 |
-| `CRIU_BIN`、`CRIU_SOCKET`、`CRIU_LAUNCH` | CRIU 路径、助手 socket、宿主启动命令 |
+| `CRIU_CLIENT`、`CRIU_BIN`、`CRIU_SOCKET`、`CRIU_LAUNCH` | CRIU 客户端、程序、助手 socket、宿主启动命令 |
 
-- 自定义目录：绝对路径；镜像复用保留原路径与文件
+- 同级目录相对于配置文件定位，运行时解析为绝对路径；镜像复用保留原路径与文件
 - 输入或构建参数变化：换 `INPUTS`、`CHECKPOINTS`；批大小变化：换 `CHECKPOINTS`
 - 编译器变化：换源码、构建、工具目录
 - 配置记录：`experiment.json`；配置变化后重新 `prepare`
@@ -129,5 +128,5 @@ python3 -m pip install cmake==3.31.10 ninja==1.13.0
 mountpoint -q /sys/kernel/tracing || mount -t tracefs tracefs /sys/kernel/tracing
 ```
 
-- 当前 gensoul：宿主启动入口常驻；镜像目录限定于 `results/checkpoint-validation/`
+- 当前 gensoul：宿主启动入口常驻；镜像目录限定于 `$WORK/results/checkpoint-validation/`
 - 无过滤终端：`CRIU_LAUNCH=()`

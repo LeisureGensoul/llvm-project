@@ -1,6 +1,6 @@
-/tools/
-/src/
-/build/
-/results/
-/inputs/
+/tools
+/src
+/build
+/results
+/inputs
 __pycache__/

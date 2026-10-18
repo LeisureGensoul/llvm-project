@@ -20,7 +20,7 @@ case "${1:-}" in
   prepare)
     PROFILE_DIR="$BENCH/profiles/$PROFILE"
     source "$PROFILE_DIR/config.sh"
-    CRIU=("$PYTHON" "$BENCH/checkpoint/criu.py" --socket "$CRIU_SOCKET")
+    CRIU=("$PYTHON" "$CRIU_CLIENT" --socket "$CRIU_SOCKET")
     TOOLS="$TOOLROOT/bin"
     export PATH="$TOOLS:$PATH"
     source "$BENCH/scripts/prepare.sh"
