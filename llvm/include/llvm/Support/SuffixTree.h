@@ -154,8 +154,8 @@ public:
   /// only leaf children (used by Machine Outliner).
   /// \param BoundaryStart Values at or above this lower bound are terminators
   /// and may repeat.
-  /// \param FilterCandidates Filter descendants and reverse suffix
-  /// predecessors separately in predicted priority order.
+  /// \param FilterCandidates Filter the closure of children and reverse
+  /// suffix links in predicted priority order.
   LLVM_ABI SuffixTree(const ArrayRef<unsigned> &Str,
                       bool OutlinerLeafDescendants = false,
                       unsigned BoundaryStart = SuffixTreeNode::EmptyIdx,

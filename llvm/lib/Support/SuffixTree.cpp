@@ -107,8 +107,7 @@ void SuffixTree::setLeafNodes(bool FilterCandidates) {
   // Keep reverse suffix links and filtering state in temporary traversal data.
   struct LeafInfo {
     unsigned FirstLeafIdx = 0;
-    bool ChildrenVisited = false;
-    bool PredecessorsVisited = false;
+    bool Visited = false;
     SuffixTreeNode *FirstSuffixPredecessor = nullptr;
     SuffixTreeNode *NextSuffixPredecessor = nullptr;
   };
@@ -193,13 +192,11 @@ void SuffixTree::setLeafNodes(bool FilterCandidates) {
     return LHS.Priority > RHS.Priority;
   });
 
-  auto Filter = [&](SuffixTreeNode *Node, bool FollowChildren) {
+  auto Filter = [&](SuffixTreeNode *Node) {
     auto &Info = ChildrenMap.find(Node)->second;
-    bool &Visited =
-        FollowChildren ? Info.ChildrenVisited : Info.PredecessorsVisited;
-    if (Visited)
+    if (Info.Visited)
       return;
-    Visited = true;
+    Info.Visited = true;
     Node->setLeftLeafIdx(SuffixTreeNode::EmptyIdx);
     Node->setRightLeafIdx(SuffixTreeNode::EmptyIdx);
     ToVisit.push_back(Node);
@@ -207,25 +204,22 @@ void SuffixTree::setLeafNodes(bool FilterCandidates) {
   for (const Candidate &C : ByPriority) {
     SuffixTreeNode *Node = C.Node;
     auto &Info = ChildrenMap.find(Node)->second;
-    if (Info.ChildrenVisited || Info.PredecessorsVisited)
+    if (Info.Visited)
       continue;
 
-    // Keep this node; expand descendants and suffix predecessors separately.
-    Info.ChildrenVisited = Info.PredecessorsVisited = true;
+    // Keep this node and filter the closure of children and reverse suffix
+    // links.
+    Info.Visited = true;
     ToVisit.push_back(Node);
     while (!ToVisit.empty()) {
       SuffixTreeNode *Curr = ToVisit.pop_back_val();
       for (auto &Child : Curr->Children)
         if (auto *InternalChild = dyn_cast<SuffixTreeNode *>(Child.second))
-          Filter(InternalChild, true);
-    }
-    ToVisit.push_back(Node);
-    while (!ToVisit.empty()) {
-      SuffixTreeNode *Curr = ToVisit.pop_back_val();
+          Filter(InternalChild);
       for (SuffixTreeNode *Pred =
                ChildrenMap.find(Curr)->second.FirstSuffixPredecessor;
            Pred; Pred = ChildrenMap.find(Pred)->second.NextSuffixPredecessor)
-        Filter(Pred, false);
+        Filter(Pred);
     }
   }
 }
