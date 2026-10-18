@@ -54,7 +54,10 @@ SuffixTree::SuffixTree(const ArrayRef<unsigned> &Str,
 void SuffixTree::insertLeaf(SuffixTreeNode &Parent, unsigned StartIdx,
                             unsigned Edge) {
   assert(StartIdx <= LeafEndIdx && "String can't start after it ends!");
-  Parent.Children[Edge] = SuffixTreeIndex(StartIdx);
+  if (isBoundary(Edge))
+    Parent.BoundarySuffixes.push_back(StartIdx - Parent.getConcatLen());
+  else
+    Parent.Children[Edge] = SuffixTreeIndex(StartIdx);
 }
 
 SuffixTreeNode *SuffixTree::insertInternalNode(SuffixTreeNode *Parent,
@@ -100,7 +103,8 @@ void SuffixTree::setLeafNodes() {
       // Its children have not been added to the stack yet.
       // We add current node back, and add its internal children to the stack.
       auto J = CurrInternalNode->Children.begin();
-      if (J != CurrInternalNode->Children.end()) {
+      if (J != CurrInternalNode->Children.end() ||
+          !CurrInternalNode->BoundarySuffixes.empty()) {
         ToVisit.push_back(CurrInternalNode);
         ChildrenMap[CurrInternalNode] = LeafCounter;
         for (; J != CurrInternalNode->Children.end(); ++J) {
@@ -113,6 +117,8 @@ void SuffixTree::setLeafNodes() {
             ++LeafCounter;
           }
         }
+        llvm::append_range(LeafNodes, CurrInternalNode->BoundarySuffixes);
+        LeafCounter += CurrInternalNode->BoundarySuffixes.size();
       }
     } else {
       // This is the second time we visit this node.
@@ -232,8 +238,10 @@ unsigned SuffixTree::extend(unsigned EndIdx, unsigned SuffixesToAdd) {
       else
         NextNode = SuffixTreeIndex(NextStartIdx);
       unsigned Edge = Str[NextStartIdx];
-      if (!isBoundary(Edge) || SplitNode->getConcatLen() >= MinLength)
+      if (!isBoundary(Edge))
         SplitNode->Children[Edge] = NextNode;
+      else if (SplitNode->getConcatLen() >= MinLength)
+        insertLeaf(*SplitNode, NextStartIdx, Edge);
 
       // SplitNode is an internal node, update the suffix link.
       if (NeedsLink)
@@ -304,6 +312,7 @@ void SuffixTree::RepeatedSubstringIterator::advance() {
       for (auto &ChildPair : Curr->Children)
         if (auto Leaf = dyn_cast<SuffixTreeIndex>(ChildPair.second))
           RepeatedSubstringStarts.push_back(Leaf - Length);
+      llvm::append_range(RepeatedSubstringStarts, Curr->BoundarySuffixes);
     }
 
     // Do we have any repeated substrings?

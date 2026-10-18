@@ -27,6 +27,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Compiler.h"
 #include <algorithm>
 #include <climits>
@@ -133,6 +134,9 @@ public:
   /// mapping by tacking that character on the end of the current string.
   /// Leaves are represented by their incoming edge start indices.
   DenseMap<unsigned, PointerUnion<SuffixTreeNode *, SuffixTreeIndex>> Children;
+
+  /// Suffix start indices of boundary leaf children.
+  SmallVector<unsigned, 0> BoundarySuffixes;
 
   SuffixTreeNode(unsigned StartIdx, unsigned EndIdx, SuffixTreeNode *Link)
       : StartIdx(StartIdx), EndIdx(EndIdx), Link(Link) {}
