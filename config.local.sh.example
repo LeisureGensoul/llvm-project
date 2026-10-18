@@ -1,7 +1,7 @@
 # 路径相对于 config.sh；仅覆盖本机需要调整的设置。
 PROJECT=../llvm-project
-SUITE=../llvm-test-suite
-# SPEC2017_ROOT=../cpu2017
+SUITE=llvm-test-suite
+# SPEC2017_ROOT=cpu2017
 
 # WORK=.
 # RESULTS=results/my-experiment

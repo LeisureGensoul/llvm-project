@@ -4,6 +4,8 @@
 /results
 /inputs
 /checkpoints
+/llvm-test-suite
+/cpu2017
 /config.local.sh
 /commits.local.list
 __pycache__/
