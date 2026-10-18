@@ -142,12 +142,9 @@ private:
   /// Each leaf is represented by its suffix start index.
   std::vector<unsigned> LeafNodes;
 
-  /// Perform a post-order depth-first traversal of the tree and perform two
-  /// tasks during the traversal. The first is to populate LeafNodes, adding
-  /// nodes in order of the traversal. The second is to keep track of the leaf
-  /// descendants of every internal node by assigning values to LeftLeafIndex
-  /// and RightLefIndex fields of SuffixTreeNode for all internal nodes.
-  void setLeafNodes();
+  /// Collect leaf descendants in post-order and record each node's leaf range.
+  /// When enabled, filter candidate regions in predicted priority order.
+  void setLeafNodes(bool FilterCandidates);
 
 public:
   /// Construct a suffix tree from a sequence of unsigned integers.
@@ -157,9 +154,12 @@ public:
   /// only leaf children (used by Machine Outliner).
   /// \param BoundaryStart Values at or above this lower bound are terminators
   /// and may repeat.
+  /// \param FilterCandidates Filter descendants and reverse suffix
+  /// predecessors separately in predicted priority order.
   LLVM_ABI SuffixTree(const ArrayRef<unsigned> &Str,
                       bool OutlinerLeafDescendants = false,
-                      unsigned BoundaryStart = SuffixTreeNode::EmptyIdx);
+                      unsigned BoundaryStart = SuffixTreeNode::EmptyIdx,
+                      bool FilterCandidates = false);
 
   /// Iterator for finding all repeated substrings in the suffix tree.
   struct RepeatedSubstringIterator {

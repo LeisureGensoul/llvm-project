@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/SuffixTree.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/SuffixTreeNode.h"
@@ -26,7 +28,8 @@ static size_t numElementsInSubstring(const SuffixTreeNode *N) {
 }
 
 SuffixTree::SuffixTree(const ArrayRef<unsigned> &Str,
-                       bool OutlinerLeafDescendants, unsigned BoundaryStart)
+                       bool OutlinerLeafDescendants, unsigned BoundaryStart,
+                       bool FilterCandidates)
     : Str(Str), OutlinerLeafDescendants(OutlinerLeafDescendants),
       BoundaryStart(BoundaryStart) {
   Root = insertRoot();
@@ -48,7 +51,7 @@ SuffixTree::SuffixTree(const ArrayRef<unsigned> &Str,
   // Collect all leaf nodes of the suffix tree. And for each internal node,
   // record the range of leaf nodes that are descendants of it.
   if (OutlinerLeafDescendants)
-    setLeafNodes();
+    setLeafNodes(FilterCandidates);
 }
 
 void SuffixTree::insertLeaf(SuffixTreeNode &Parent, unsigned StartIdx,
@@ -81,7 +84,17 @@ SuffixTreeNode *SuffixTree::insertRoot() {
                             SuffixTreeNode::EmptyIdx, /*Edge = */ 0);
 }
 
-void SuffixTree::setLeafNodes() {
+// Predict the unoutlined/outlined cost ratio from raw occurrence counts,
+// using unit instruction costs, one frame instruction and one per call.
+static double predictedPriority(unsigned Length, unsigned Count) {
+  if (Length < 2 || Count < 2)
+    return 0;
+  uint64_t Original = uint64_t(Length) * Count;
+  uint64_t Outlined = uint64_t(Length) + 1 + Count;
+  return Original > Outlined ? double(Original) / Outlined : 0;
+}
+
+void SuffixTree::setLeafNodes(bool FilterCandidates) {
   // A stack that keeps track of nodes to visit for post-order DFS traversal.
   SmallVector<SuffixTreeNode *> ToVisit;
   ToVisit.push_back(Root);
@@ -91,14 +104,28 @@ void SuffixTree::setLeafNodes() {
   unsigned LeafCounter = 0;
 
   // This keeps track of nodes whose children have been added to the stack.
-  // The value is the index of its first leaf in LeafNodes.
-  DenseMap<SuffixTreeNode *, unsigned> ChildrenMap;
+  // Keep reverse suffix links and filtering state in temporary traversal data.
+  struct LeafInfo {
+    unsigned FirstLeafIdx = 0;
+    bool ChildrenVisited = false;
+    bool PredecessorsVisited = false;
+    SuffixTreeNode *FirstSuffixPredecessor = nullptr;
+    SuffixTreeNode *NextSuffixPredecessor = nullptr;
+  };
+  DenseMap<SuffixTreeNode *, LeafInfo> ChildrenMap;
+  struct Candidate {
+    SuffixTreeNode *Node;
+    double Priority = 0;
+  };
+  SmallVector<Candidate> ByPriority;
 
   // Traverse the tree in post-order.
   while (!ToVisit.empty()) {
     SuffixTreeNode *CurrInternalNode = ToVisit.pop_back_val();
     auto I = ChildrenMap.find(CurrInternalNode);
     if (I == ChildrenMap.end()) {
+      if (FilterCandidates)
+        ByPriority.push_back({CurrInternalNode});
       // This is the first time we visit this node.
       // Its children have not been added to the stack yet.
       // We add current node back, and add its internal children to the stack.
@@ -106,7 +133,7 @@ void SuffixTree::setLeafNodes() {
       if (J != CurrInternalNode->Children.end() ||
           !CurrInternalNode->BoundarySuffixes.empty()) {
         ToVisit.push_back(CurrInternalNode);
-        ChildrenMap[CurrInternalNode] = LeafCounter;
+        ChildrenMap[CurrInternalNode].FirstLeafIdx = LeafCounter;
         for (; J != CurrInternalNode->Children.end(); ++J) {
           if (auto *InternalChild = dyn_cast<SuffixTreeNode *>(J->second)) {
             ToVisit.push_back(InternalChild);
@@ -126,11 +153,79 @@ void SuffixTree::setLeafNodes() {
       // The root does not need a leaf range.
       if (CurrInternalNode->isRoot())
         continue;
-      CurrInternalNode->setLeftLeafIdx(I->second);
+      CurrInternalNode->setLeftLeafIdx(I->second.FirstLeafIdx);
       CurrInternalNode->setRightLeafIdx(LeafCounter - 1);
       assert(CurrInternalNode->getLeftLeafIdx() <=
                  CurrInternalNode->getRightLeafIdx() &&
              "LeftLeafIdx should not be larger than RightLeafIdx");
+    }
+  }
+
+  if (!FilterCandidates)
+    return;
+
+  for (Candidate &C : ByPriority) {
+    ChildrenMap.try_emplace(C.Node);
+    if (C.Node->getLeftLeafIdx() != SuffixTreeNode::EmptyIdx)
+      C.Priority = predictedPriority(C.Node->getConcatLen(),
+                                     C.Node->getRightLeafIdx() -
+                                         C.Node->getLeftLeafIdx() + 1);
+  }
+  for (const Candidate &C : ByPriority) {
+    SuffixTreeNode *Node = C.Node;
+    auto Link = ChildrenMap.find(Node->getLink());
+    if (Link == ChildrenMap.end())
+      continue;
+    ChildrenMap.find(Node)->second.NextSuffixPredecessor =
+        Link->second.FirstSuffixPredecessor;
+    Link->second.FirstSuffixPredecessor = Node;
+  }
+
+  llvm::erase_if(ByPriority, [](const Candidate &C) {
+    if (C.Priority)
+      return false;
+    SuffixTreeNode *Node = C.Node;
+    Node->setLeftLeafIdx(SuffixTreeNode::EmptyIdx);
+    Node->setRightLeafIdx(SuffixTreeNode::EmptyIdx);
+    return true;
+  });
+  llvm::stable_sort(ByPriority, [](const Candidate &LHS, const Candidate &RHS) {
+    return LHS.Priority > RHS.Priority;
+  });
+
+  auto Filter = [&](SuffixTreeNode *Node, bool FollowChildren) {
+    auto &Info = ChildrenMap.find(Node)->second;
+    bool &Visited =
+        FollowChildren ? Info.ChildrenVisited : Info.PredecessorsVisited;
+    if (Visited)
+      return;
+    Visited = true;
+    Node->setLeftLeafIdx(SuffixTreeNode::EmptyIdx);
+    Node->setRightLeafIdx(SuffixTreeNode::EmptyIdx);
+    ToVisit.push_back(Node);
+  };
+  for (const Candidate &C : ByPriority) {
+    SuffixTreeNode *Node = C.Node;
+    auto &Info = ChildrenMap.find(Node)->second;
+    if (Info.ChildrenVisited || Info.PredecessorsVisited)
+      continue;
+
+    // Keep this node; expand descendants and suffix predecessors separately.
+    Info.ChildrenVisited = Info.PredecessorsVisited = true;
+    ToVisit.push_back(Node);
+    while (!ToVisit.empty()) {
+      SuffixTreeNode *Curr = ToVisit.pop_back_val();
+      for (auto &Child : Curr->Children)
+        if (auto *InternalChild = dyn_cast<SuffixTreeNode *>(Child.second))
+          Filter(InternalChild, true);
+    }
+    ToVisit.push_back(Node);
+    while (!ToVisit.empty()) {
+      SuffixTreeNode *Curr = ToVisit.pop_back_val();
+      for (SuffixTreeNode *Pred =
+               ChildrenMap.find(Curr)->second.FirstSuffixPredecessor;
+           Pred; Pred = ChildrenMap.find(Pred)->second.NextSuffixPredecessor)
+        Filter(Pred, false);
     }
   }
 }
@@ -303,6 +398,8 @@ void SuffixTree::RepeatedSubstringIterator::advance() {
 
     // Collect leaf children or leaf descendants by OutlinerLeafDescendants.
     if (OutlinerLeafDescendants) {
+      if (Curr->getLeftLeafIdx() == SuffixTreeNode::EmptyIdx)
+        continue;
       // Leaf descendants occupy a contiguous range.
       RepeatedSubstringStarts.append(LeafNodes.begin() + Curr->getLeftLeafIdx(),
                                      LeafNodes.begin() +

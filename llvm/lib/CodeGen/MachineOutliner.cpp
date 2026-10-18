@@ -825,7 +825,8 @@ void MachineOutliner::findCandidates(
     std::vector<std::unique_ptr<OutlinedFunction>> &FunctionList) {
   FunctionList.clear();
   SuffixTree ST(Mapper.UnsignedVec, OutlinerLeafDescendants,
-                /*BoundaryStart=*/Mapper.LegalInstrNumber);
+                /*BoundaryStart=*/Mapper.LegalInstrNumber,
+                /*FilterCandidates=*/true);
 
   // First, find all of the repeated substrings in the tree of minimum length
   // 2.
