@@ -37,8 +37,6 @@ bash run.sh summarize
 | [profiles/outliner/](profiles/outliner/) | Outliner 编译参数、阶段边界、测试选择和实现适配 |
 | [docs/](docs/) | 配置、缓存复用与测量口径 |
 
-`scripts/prepare.sh` 负责源码与构建准备，`correctness.py` 执行正确性检查，`commands.py` 收集编译命令。`bench.py` 调度实验，`checkpoint.py` 管理镜像与 fork，`phases.py` 配置采集，`report.py` 汇总并生成报告。
-
 ## 本机目录
 
 ```text
@@ -55,4 +53,4 @@ bash run.sh summarize
     └── results/         # 原始数据、报告与本地 PR 材料
 ```
 
-这些依赖与产物均忽略提交，可通过配置或相对符号链接复用已有目录。配置中的相对路径从实验目录解析，与启动时的工作目录无关。已有构建和镜像依赖原绝对路径，复用时保留原文件及路径；新机器重新准备本机缓存。
+这些目录及本机配置均忽略提交。路径设置与缓存复用见 [配置说明](docs/configuration.md)。

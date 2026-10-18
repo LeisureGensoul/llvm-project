@@ -12,7 +12,7 @@ python3 -m pip install cmake==3.31.10 ninja==1.13.0
 mountpoint -q /sys/kernel/tracing || mount -t tracefs tracefs /sys/kernel/tracing
 ```
 
-LLVM 源码默认位于 `../llvm-project`，测试源码默认位于实验目录中的 `llvm-test-suite/`；SPEC 输入还需要授权的 `cpu2017/`。两者可用相对符号链接指向已有源码。
+SPEC2017 输入需要授权的 `cpu2017/` 源码。
 
 ## 本机设置
 
@@ -39,8 +39,6 @@ LLVM 源码默认位于 `../llvm-project`，测试源码默认位于实验目录
 | `PYTHON`、`BPF_CLANG` | Python 与 BPF 编译器；`python3`、`clang` |
 | `CRIU_CLIENT`、`CRIU_BIN` | 仓库内客户端 `checkpoint/criu.py`、`criu` |
 | `CRIU_SOCKET`、`CRIU_LAUNCH` | 助手 socket 与宿主启动命令；`WORK/build/criu.sock`、空数组 |
-
-`bash run.sh check` 检查环境与提交；`prepare` 和 `measure` 也会先检查。每次实验指定新结果目录，已有 `measurements.jsonl` 时拒绝覆盖。
 
 `CRIU_LAUNCH=()` 从未被 seccomp 过滤的 root 环境直接启动助手。容器中需配置宿主允许的启动命令；程序在命令末尾追加 Python、`checkpoint/helper.py` 及其参数。宿主要求固定客户端路径时设置 `CRIU_CLIENT`。
 
