@@ -68,8 +68,11 @@ static int dump(int fd) {
     else
       printf("null");
     printf(",\"peak_rss_bytes\":%llu,"
+           "\"entry_rss_bytes\":%llu,"
+           "\"peak_rss_increase_bytes\":%llu,"
            "\"calls\":%llu}\n",
-           values.peak[i], values.calls[i]);
+           values.peak[i], values.entry_rss[i], values.peak_rss_increase[i],
+           values.calls[i]);
   }
   printf("{\"status\":[%llu,%lld]}\n", values.errors, values.open);
   fflush(stdout);
@@ -112,9 +115,31 @@ int main(int argc, char **argv) {
       bpf_map_update_elem(config_fd, &key, &cfg, BPF_ANY))
     goto cleanup;
 
+  struct bpf_program *initializer = bpf_object__find_program_by_name(object, "init_rss");
+  struct bpf_link *init_link = bpf_program__attach_iter(initializer, NULL);
+  if (libbpf_get_error(init_link))
+    goto cleanup;
+  int init_fd = bpf_iter_create(bpf_link__fd(init_link));
+  if (init_fd >= 0) {
+    char buffer[64];
+    ssize_t bytes;
+    do {
+      bytes = read(init_fd, buffer, sizeof(buffer));
+    } while (bytes > 0);
+    close(init_fd);
+    if (bytes < 0)
+      init_fd = -1;
+  }
+  bpf_link__destroy(init_link);
+  if (init_fd < 0 || bpf_map_lookup_elem(config_fd, &key, &cfg) || !cfg.rss_ready) {
+    fprintf(stderr, "Cannot initialize complete kernel RSS counters\n");
+    goto cleanup;
+  }
+
   struct bpf_program *program;
   bpf_object__for_each_program(program, object) {
-    if (!strncmp(bpf_program__section_name(program), "uprobe/", 7))
+    if (!strncmp(bpf_program__section_name(program), "uprobe/", 7) ||
+        !strncmp(bpf_program__section_name(program), "iter/", 5))
       continue;
     char category[32], name[64];
     int tracepoint = sscanf(bpf_program__section_name(program),

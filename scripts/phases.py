@@ -14,6 +14,9 @@ def merge_metrics(total, sample):
         row['cpu_seconds'] += values['cpu_seconds'] or 0
         row['calls'] += values['calls']
         row['peak_rss_mib'] = max(row['peak_rss_mib'], values['peak_rss_mib'])
+        for metric in ('entry_rss_mib', 'peak_rss_increase_mib'):
+            if metric in values:
+                row[metric] = max(row.get(metric, 0.0), values[metric])
 
 
 def require(condition, message):
@@ -127,7 +130,10 @@ def build_collector(protocol, directory, compiler):
     directory.mkdir(parents=True, exist_ok=True)
     phases = protocol['phases']
     ids = {phase['name']: index for index, phase in enumerate(phases)}
+    cpu_count = max(int(part.split('-')[-1]) for part in
+                    Path('/sys/devices/system/cpu/possible').read_text().strip().split(',')) + 1
     header = [f'#define PHASE_COUNT {len(phases)}',
+              f'#define CPU_COUNT {cpu_count}',
               '#define PHASE_NAMES {' + ', '.join(json.dumps(p['name']) for p in phases) + '}',
               '#define TIMED_PHASES {' + ', '.join(str(int(p['cpu'] == 'bpf')) for p in phases) + '}']
     cases = []
@@ -197,6 +203,9 @@ def parse_metrics(events, protocol, path):
                 f'{path}: {name}: CPU source differs from protocol')
         recorded[name] = dict(cpu_seconds=None if cpu is None else cpu / 1e9,
                               calls=event['calls'], peak_rss_mib=event['peak_rss_bytes'] / 2**20)
+        if 'entry_rss_bytes' in event:
+            recorded[name].update(entry_rss_mib=event['entry_rss_bytes'] / 2**20,
+                                 peak_rss_increase_mib=event['peak_rss_increase_bytes'] / 2**20)
     require(status == [0, 0], f'{path}: capture errors or incomplete boundaries: {status}')
     require(set(recorded) == set(sources), f'{path}: missing phase results')
     for name, values in recorded.items():
@@ -204,6 +213,10 @@ def parse_metrics(events, protocol, path):
                 f'{path}: {name}: missing RSS or unexpected peak')
         require(values['calls'] or values['cpu_seconds'] in (None, 0),
                 f'{path}: {name}: CPU without phase calls')
+        if 'entry_rss_mib' in values:
+            require(0 <= values['entry_rss_mib'] <= values['peak_rss_mib'] and
+                    0 <= values['peak_rss_increase_mib'] <= values['peak_rss_mib'],
+                    f'{path}: {name}: invalid RSS entry or increase')
     return recorded
 
 

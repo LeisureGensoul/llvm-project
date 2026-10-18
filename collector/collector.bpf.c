@@ -6,12 +6,34 @@
 #include "collector.h"
 #include "layout.h"
 
+struct percpu_counter {
+  long long count;
+  int *counters;
+} __attribute__((preserve_access_index));
+
+struct mm_struct {
+  struct percpu_counter rss_stat[4];
+} __attribute__((preserve_access_index));
+
 struct task_struct {
   int pid, tgid;
+  struct mm_struct *mm;
 } __attribute__((preserve_access_index));
+
+struct bpf_iter_meta;
+struct kallsym_iter {
+  unsigned long value;
+  char name[512];
+} __attribute__((preserve_access_index));
+struct bpf_iter__ksym {
+  struct bpf_iter_meta *meta;
+  struct kallsym_iter *ksym;
+};
 
 struct task_state {
   unsigned int depth[PHASE_COUNT];
+  unsigned long long entry_rss[PHASE_COUNT];
+  unsigned long long peak_rss[PHASE_COUNT];
 };
 
 struct process_state {
@@ -50,6 +72,55 @@ static __always_inline struct settings *settings(void) {
   return bpf_map_lookup_elem(&config, &zero);
 }
 
+SEC("iter/ksym")
+int init_rss(struct bpf_iter__ksym *ctx) {
+  struct kallsym_iter *iter = ctx->ksym;
+  struct settings *cfg = settings();
+  if (!iter || !cfg || cfg->rss_ready)
+    return 0;
+  char name[17] = {}, wanted[] = "__per_cpu_offset";
+  if (bpf_core_read_str(name, sizeof(name), &iter->name) < 0)
+    return 0;
+#pragma unroll
+  for (int i = 0; i < 17; ++i)
+    if (name[i] != wanted[i])
+      return 0;
+  unsigned long address = BPF_CORE_READ(iter, value);
+  for (int cpu = 0; cpu < CPU_COUNT; ++cpu)
+    if (bpf_probe_read_kernel(&cfg->cpu_offsets[cpu], sizeof(unsigned long),
+                              (void *)(address + cpu * sizeof(unsigned long))))
+      return 0;
+  cfg->rss_ready = 1;
+  return 0;
+}
+
+static __always_inline long long sum_counter(struct percpu_counter *counter,
+                                             struct settings *cfg) {
+  long long total = BPF_CORE_READ(counter, count);
+  int *locals = BPF_CORE_READ(counter, counters);
+  for (int cpu = 0; cpu < CPU_COUNT; ++cpu) {
+    int local = 0;
+    if (bpf_probe_read_kernel(&local, sizeof(local),
+                              (char *)locals + cfg->cpu_offsets[cpu]))
+      return -1;
+    total += local;
+  }
+  return total > 0 ? total * 4096 : 0;
+}
+
+static __always_inline int refresh_rss(struct process_state *p,
+                                       struct settings *cfg) {
+  struct task_struct *task = (void *)bpf_get_current_task();
+  struct mm_struct *mm = BPF_CORE_READ(task, mm);
+  if (!mm || !cfg->rss_ready)
+    return -1;
+  // Match rss_stat's full per-CPU sum, rather than /proc/status's approximation.
+  p->rss[0] = sum_counter(__builtin_preserve_access_index(&mm->rss_stat[0]), cfg);
+  p->rss[1] = sum_counter(__builtin_preserve_access_index(&mm->rss_stat[1]), cfg);
+  p->rss[3] = sum_counter(__builtin_preserve_access_index(&mm->rss_stat[3]), cfg);
+  return p->rss[0] < 0 || p->rss[1] < 0 || p->rss[3] < 0 ? -1 : 0;
+}
+
 static __always_inline void charge(struct metrics *s) {
   unsigned long long now = bpf_ktime_get_ns();
   struct process_state *p = bpf_map_lookup_elem(&processes, &s->running);
@@ -75,6 +146,10 @@ static __always_inline void begin_phase(struct metrics *s, struct task_state *t,
   p->active[i]++;
   s->open++;
   s->calls[i]++;
+  t->entry_rss[i] = total;
+  t->peak_rss[i] = total;
+  if (total > s->entry_rss[i])
+    s->entry_rss[i] = total;
   if (total > s->peak[i])
     s->peak[i] = total;
 }
@@ -85,6 +160,11 @@ static __always_inline void end_phase(struct metrics *s, struct task_state *t,
     if (--t->depth[i])
       return;
     unsigned long long total = rss(p);
+    if (total > t->peak_rss[i])
+      t->peak_rss[i] = total;
+    unsigned long long increase = t->peak_rss[i] - t->entry_rss[i];
+    if (increase > s->peak_rss_increase[i])
+      s->peak_rss_increase[i] = increase;
     if (total > s->peak[i])
       s->peak[i] = total;
     p->active[i]--;
@@ -110,8 +190,14 @@ int boundary(struct pt_regs *ctx) {
     s->errors++;
     return 0;
   }
-  unsigned long long total = rss(p);
   charge(s);
+  if (refresh_rss(p, cfg)) {
+    s->errors++;
+    return 0;
+  }
+  // Exclude boundary RSS sampling from every active phase's CPU time.
+  s->last = bpf_ktime_get_ns();
+  unsigned long long total = rss(p);
   s->running = pid;
   switch (bpf_get_attach_cookie(ctx)) {
     PHASE_ACTIONS
@@ -125,9 +211,6 @@ int register_task(struct pt_regs *ctx) {
   unsigned int tid = id, pid = id >> 32;
   struct task_state t = {};
   struct process_state p = {};
-  p.rss[0] = PT_REGS_PARM1(ctx);
-  p.rss[1] = PT_REGS_PARM2(ctx);
-  p.rss[3] = PT_REGS_PARM3(ctx);
   if (bpf_map_update_elem(&tasks, &tid, &t, BPF_ANY) ||
       bpf_map_update_elem(&processes, &pid, &p, BPF_ANY)) {
     struct metrics *s = summary();
@@ -160,6 +243,8 @@ int rss_update(struct rss_event *ctx) {
   for (int i = 0; i < PHASE_COUNT; ++i) {
     if (p->active[i] && total > s->peak[i])
       s->peak[i] = total;
+    if (t->depth[i] && total > t->peak_rss[i])
+      t->peak_rss[i] = total;
   }
   return 0;
 }

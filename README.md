@@ -25,7 +25,7 @@ bash run.sh summarize
 
 ## 当前本地基线
 
-- 固定 main：`f14f34f217a99d77628d547b1b3ba9fa47fbd06b`；提交清单为此基线上的 15 个优化提交。
+- 固定 main：`f14f34f217a99d77628d547b1b3ba9fa47fbd06b`；提交清单为此基线上的四个 PR、14 个优化提交。
 - 保留当前编译器、`build/pr-metadata-f14/` 和
   `results/checkpoint-validation/pr-metadata-f14/checkpoints/`；保持绝对路径。
 - `inputs/pr-metadata-f14/` 是可删除的输入命令缓存；删除后，测量前先运行 `prepare` 重建。
@@ -90,11 +90,14 @@ bash run.sh summarize
 | --- | --- |
 | CPU / s | 每轮各输入求和 → 轮次均值；含子调用；同阶段嵌套仅计最外层 |
 | `peak_rss_mib` | 阶段内进程绝对峰值；每轮各输入取最大 → 轮次均值 |
+| `entry_rss_mib` | 每次阶段调用入口的进程 RSS；每轮各输入取最大 → 轮次均值 |
+| `peak_rss_increase_mib` | 每次阶段调用先计算期间峰值减去该次入口 RSS；每轮各输入取最大 → 轮次均值 |
 | 相对变化 / % | `(本版/参照版−1)×100`；基线、前一提交；零参照留空 |
 | 运行开销 / s | 镜像准备、保存、恢复、fork、加载、镜像收尾；经过时间 |
 
 - RSS：BPF 入口记录、测量核心 `rss_stat`；FILE + ANON + SHMEM
 - RSS：含此前保留的数据；阶段峰值不相加；内核批量记账；外部回收未覆盖
+- RSS 增量：每次调用独立计算；不能用汇总后的峰值减去汇总后的入口。它表示进程驻留内存相对入口的最大增加，不等于分配器的总申请量。
 - BPF CPU：含探针、中断；最终 mapper / candidate 清理计入完整 pass
 - 保留全部轮次原值；均值结合逐轮数据查看
 - 步骤耗时与 pass CPU 分别统计；`measure` 含实际 pass 执行
