@@ -3,4 +3,7 @@
 /build
 /results
 /inputs
+/checkpoints
+/config.local.sh
+/commits.local.list
 __pycache__/

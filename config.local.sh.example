@@ -1,0 +1,19 @@
+# 路径相对于 config.sh；仅覆盖本机需要调整的设置。
+PROJECT=../llvm-project
+SUITE=../llvm-test-suite
+# SPEC2017_ROOT=../cpu2017
+
+# WORK=.
+# RESULTS=results/my-experiment
+# COMMITS=commits.list
+# PASS_CPU=0
+# COLLECTOR_CPU=2
+# PREPARE_JOBS=16
+# BPF_CLANG=clang
+# CRIU_BIN=criu
+# CRIU_CLIENT=checkpoint/criu.py
+# CRIU_SOCKET=build/criu.sock
+
+# 在未被 seccomp 过滤的 root 环境中直接启动时保持为空。
+# 否则填写本机允许的宿主启动命令；末尾会追加 Python 与 helper.py 参数。
+# CRIU_LAUNCH=()

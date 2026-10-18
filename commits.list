@@ -1,16 +1,3 @@
-# 版本  提交；首项为固定 main 基线，其余按四个 PR 的顺序
-A f14f34f217a99d77628d547b1b3ba9fa47fbd06b # main
-B 80aa1994d64f7b749b6f7e5f8865ffcf90afc3cd # [Support] Initialize suffix tree metadata during construction
-C b2e5b887f88b56b812adbcd895ae6034654df235 # [MachineOutliner] Skip single-instruction legal ranges
-D 79435120aa6e682916b058086b448d25ea7cd647 # [MachineOutliner] Omit redundant separators
-E 3420af632c0a7c590ec1c03c56a8e8667598ec26 # [Support] Identify unique terminators in SuffixTree
-F 5d0d68691d1e383556c5a684a2351e2b0baf70ce # [Support] Skip child lookups for unique terminators
-G adc7aea7f84e0d26f04562d9f429fd75a4edc0d9 # [Support] Prune boundary leaves on short paths
-H 64f43ef3b600af665169b114a42206148ccb44a3 # [Support] Skip leaf edge length checks
-I e6619dc184d8c6d2a858c28e6973086e7ed1b4fd # [Support] Reuse suffix tree edge start indices
-J 7f2d8a0d7822f9b9874185e40b565d85fb7c7af4 # [Support] Store suffix indices in the leaf list
-K d92e24daf248081bf390a02dc0a42c503bcf671b # [Support] Collect leaf suffixes at their parent
-L b29152676b920bc7038c8630f82d270940ea0ce9 # [Support] Make insertLeaf return void (NFC)
-M 87dc9224edcc75da0d65ddddf76402ecab2209fd # [Support] Store leaves as edge indices
-N 466713e8dd39b03d8c2f2c4a79bdcc9cef28f051 # [Support] Remove the obsolete suffix tree leaf type
-O 23fe5fb5081ffd834e3d3c4c3e289907bfe1ff3e # [Support] Merge suffix tree node types
+# 示例：基线与 INPUT_COMMIT 一致；候选提交使用相同基底。
+baseline f14f34f217a99d77628d547b1b3ba9fa47fbd06b
+optimized outliner-dev

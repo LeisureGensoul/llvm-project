@@ -2,35 +2,38 @@
 
 固定输入 → pass 入口镜像 → 恢复一次、fork 各版本 → 汇总。
 
-## 三步运行
+## 使用
 
-修改 [config.sh](config.sh)、[commits.list](commits.list)；每次使用新的 `RESULTS` 目录。
+Linux x86_64；需要 root、BTF、tracefs、BPF 和 CRIU 权限。LLVM 源码仓库和 llvm-test-suite 默认位于同级目录。
 
 ```bash
-# 从 LLVM 工作目录进入同级实验目录
-cd ../llvm-bench
+cd llvm-bench
+cp config.local.sh.example config.local.sh
+# 修改本机设置和 commits.list，确保待测提交在 PROJECT 仓库中可获取。
+bash run.sh check
 bash run.sh prepare
 bash run.sh measure
 bash run.sh summarize
 ```
 
-- `prepare`：输入编译器；末项提交的 LLVM 测试；命令与依赖；实现库与采集器
-- `measure`：首次编译、保存；恢复、fork、执行 pass、记录指标；压缩留存
-- `summarize`：逐轮数据；轮次均值；相对基线、前一提交的变化
+- `config.sh`：公共默认配置；默认测量 CTMark，十轮，NoLTO/FullLTO。
+- `config.local.sh`：本机路径、CPU、工具和 CRIU 启动方式；忽略提交。
+- `commits.list`：示例基线与 `INPUT_COMMIT` 一致，候选为 LLVM 仓库中的 `outliner-dev`，可替换为同一基底上的提交。可通过 `COMMITS` 指定其他清单。
+- `BENCH_LOCAL_CONFIG=路径`：选择另一份本机配置；相对路径从实验目录解析。
+- `check`：检查依赖、内核接口、CPU、CRIU 启动配置及待测提交；`prepare` 和 `measure` 也会先检查。
+- `prepare`：输入编译器、末项提交的正确性测试、输入命令、实现库和采集器。
+- `measure`：保存或恢复输入镜像，逐版本执行并采集指标；助手自动启停。
+- `summarize`：汇总逐轮数据、均值、相对基线和前一提交的变化。
 
-- 后续比对：改提交清单、结果目录；复用输入与镜像；仍然三步
-- 并行：前置准备；串行：被测 pass；固定测量核心
-- CRIU 助手：`measure` 自动启停；完成、报错、中断后关闭
-- 三步经过时间：自动记录 `timings.json`
+每次实验指定新的 `RESULTS` 目录；已有原始测量数据时拒绝准备或覆盖测量。准备可并行，测量串行并固定 CPU 核心；步骤经过时间保存在 `timings.json`。
 
-## 当前本地基线
+## 工作目录
 
-- `llvm-bench` 和 `llvm-project` 为同级工作树，分别使用实验分支和 LLVM 优化分支，可独立切换。
-- 固定 main：`f14f34f217a99d77628d547b1b3ba9fa47fbd06b`；提交清单为此基线上的四个 PR、14 个优化提交。
-- `WORK` 位于 `../llvm-project/llvm-bench`；现有编译器、负载构建、镜像和宿主 CRIU 入口使用其绝对路径。实验目录中的 `tools/`、`src/`、`build/`、`results/` 通过相对链接指向这些缓存。
-- `prepare` 生成输入命令缓存；复用镜像时保持 `WORK` 的绝对路径。
-- 后续补充优化：更新 `commits.list`、换新的 `RESULTS`，仍执行三步；输入和镜像继续复用。
-- [PR 与实验记录](results/README.md)包含各次性能比较；十轮数据按数值去掉最大、最小值后，取剩余八轮均值。
+默认 `WORK` 为实验目录，源码缓存、构建、输入命令、镜像和结果均在其下创建；无需从其他机器复制缓存。配置中的相对路径从 `config.sh` 所在目录解析，与启动时的工作目录无关。
+
+不同电脑分别构建输入编译器和镜像。复用本机缓存时保持原绝对路径；CMake 构建和进程镜像不能仅靠修改配置搬迁。本机通过 `config.local.sh` 指定已有缓存和宿主入口，公共配置不依赖这些路径。
+
+`CRIU_LAUNCH=()` 表示从未被 seccomp 过滤的 root 环境直接启动仓库中的助手。容器中可配置宿主允许的启动命令；启动时会追加 Python、`checkpoint/helper.py` 及其参数。需要固定客户端路径的宿主入口可覆盖 `CRIU_CLIENT`。
 
 ## 配置
 
@@ -49,8 +52,8 @@ bash run.sh summarize
 | `PREPARE_JOBS` | 准备并行度、NoLTO 每批单元上限；默认 16 |
 | `PASS_CPU`、`COLLECTOR_CPU` | 被测 pass、采集器；不同物理核心 |
 | `PROJECT`、`SUITE`、`SPEC2017_ROOT` | llvm-project、llvm-test-suite、授权 cpu2017 源码；默认同级 |
-| `WORK`、`TOOLROOT` | 固定缓存目录、辅助工具；当前 `WORK` 为相对实验目录的 `../llvm-project/llvm-bench`，工具为其下的 `tools/<INPUT_COMMIT>/` |
-| `INPUT_SOURCE`、`INPUT_BUILD`、`WORKLOAD_BUILD` | 编译器源码、编译器构建、负载构建；当前 `src/compiler-<INPUT_COMMIT>/`、`build/compiler-<INPUT_COMMIT>/`、`build/pr-metadata-f14/` |
+| `WORK`、`TOOLROOT` | 缓存根目录、辅助工具；默认实验目录及其下的 `tools/<INPUT_COMMIT>/` |
+| `INPUT_SOURCE`、`INPUT_BUILD`、`WORKLOAD_BUILD` | 编译器源码、编译器构建、负载构建；默认 `src/compiler-<INPUT_COMMIT>/`、`build/compiler-<INPUT_COMMIT>/`、`build/workloads-<INPUT_COMMIT>/` |
 | `INPUTS`、`CHECKPOINTS`、`RESULTS` | 命令、压缩镜像、本次结果；按输入集分目录 |
 | `CRIU_CLIENT`、`CRIU_BIN`、`CRIU_SOCKET`、`CRIU_LAUNCH` | CRIU 客户端、程序、助手 socket、宿主启动命令 |
 
@@ -114,19 +117,18 @@ bash run.sh summarize
 | `CHECKPOINTS/<输入集>/FullLTO/<程序>/00000/` | 一个链接目标的镜像 |
 
 - 镜像：`images/`；内存页 `pages-*.img.zst`；空间：原始、压缩留存
-- 版本管理：配置、说明、脚本；忽略 `tools/`、`src/`、`build/`、`inputs/`、`results/`
+- 版本管理：配置、说明、脚本；忽略本机配置、`tools/`、`src/`、`build/`、`inputs/`、`checkpoints/`、`results/`
 
 ## 一次性环境准备
 
-root、BTF、tracefs、BPF / perf 权限、CRIU 4.2.1、检查点权限。
+安装工具后，使用 `bash run.sh check` 确认当前机器的依赖和权限。
 
 ```bash
 # Ubuntu
 apt-get install -y gcc g++ python3 python3-pip binutils rsync tcl \
-  clang-14 libbpf-dev libelf-dev pkg-config zstd
+  clang libbpf-dev libelf-dev pkg-config zstd criu
 python3 -m pip install cmake==3.31.10 ninja==1.13.0
 mountpoint -q /sys/kernel/tracing || mount -t tracefs tracefs /sys/kernel/tracing
 ```
 
-- 当前 gensoul：宿主启动入口常驻；镜像目录限定于 `$WORK/results/checkpoint-validation/`
-- 无过滤终端：`CRIU_LAUNCH=()`
+缓存、实验结果和本机启动配置不纳入 Git；迁移代码时重新准备目标机器。

@@ -90,7 +90,7 @@ build_input_toolchain() {
   snapshot_source "$INPUT_COMMIT" "$INPUT_SOURCE"
   cmake -S "$INPUT_SOURCE/llvm" -B "$INPUT_BUILD" -G Ninja \
     -DCMAKE_MAKE_PROGRAM="$TOOLS/ninja" \
-    -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ \
+    -DCMAKE_C_COMPILER="$(command -v gcc)" -DCMAKE_CXX_COMPILER="$(command -v g++)" \
     -DCMAKE_BUILD_TYPE=Release '-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG' \
     '-DCMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG' \
     -DLLVM_ENABLE_ASSERTIONS=OFF -DLLVM_ENABLE_LTO=OFF \
